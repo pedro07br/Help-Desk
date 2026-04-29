@@ -7,10 +7,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/chamados")
 public class ChamadoController {
+
     private final ChamadoService chamadoService;
 
     public ChamadoController(ChamadoService chamadoService) {
@@ -19,19 +21,38 @@ public class ChamadoController {
 
     @GetMapping
     public ResponseEntity<List<Chamado>> listarTodos() {
-        List<Chamado> lista = chamadoService.listarTodos();
-        return ResponseEntity.ok(lista);
+        return ResponseEntity.ok(chamadoService.listarTodos());
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<Chamado> buscarPorId(@PathVariable Long id) {
-        Chamado chamado = chamadoService.buscarPorId(id);
-        return ResponseEntity.ok(chamado);
+        return ResponseEntity.ok(chamadoService.buscarPorId(id));
     }
 
+    /** Filtra chamados por status: GET /chamados/status/ABERTO */
+    @GetMapping("/status/{status}")
+    public ResponseEntity<List<Chamado>> listarPorStatus(@PathVariable Chamado.Status status) {
+        return ResponseEntity.ok(chamadoService.listarPorStatus(status));
+    }
+
+    /** Cria novo chamado (publica no Kafka automaticamente) */
     @PostMapping
     public ResponseEntity<Chamado> criar(@RequestBody Chamado chamado) {
-        Chamado novoChamado = chamadoService.salvar(chamado);
-        return ResponseEntity.status(HttpStatus.CREATED).body(novoChamado);
+        Chamado novo = chamadoService.salvar(chamado);
+        return ResponseEntity.status(HttpStatus.CREATED).body(novo);
+    }
+
+    /**
+     * Atualiza o status de um chamado e publica o evento no Kafka.
+     * PATCH /chamados/1/status  body: { "status": "EM_ANDAMENTO" }
+     */
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<Chamado> atualizarStatus(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body) {
+
+        Chamado.Status novoStatus = Chamado.Status.valueOf(body.get("status").toUpperCase());
+        Chamado atualizado = chamadoService.atualizarStatus(id, novoStatus);
+        return ResponseEntity.ok(atualizado);
     }
 }
